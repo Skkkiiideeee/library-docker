@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo-init:/docker-entrypoint-initdb.d    # for init scripts
+      - mongo_data:/data/db                         # 🟢 persistent data volume
+    networks:
+      - app-network
+
+  app:
+    image: skkkiiideeee/a-library-website:latest
+    container_name: spring-app
+    ports:
+      - "2943:2943"
+    depends_on:
+      - mongo
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/library
+    networks:
+      - app-network
+
+volumes:
+  mongo_data:   # 🟢 declare volume here
+
+networks:
+  app-network:
+    driver: bridge

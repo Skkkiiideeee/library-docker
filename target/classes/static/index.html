@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Library App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 30px;
+      justify-content: center;
+    }
+    input[type="text"],
+    input[type="number"] {
+      padding: 10px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      flex: 1 1 150px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      background-color: #007BFF;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+      flex: 1 1 100px;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    ul#bookList {
+      list-style: none;
+      padding: 0;
+    }
+    ul#bookList li {
+      background: white;
+      margin-bottom: 12px;
+      padding: 12px 20px;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    ul#bookList li span.info {
+      flex: 1;
+      margin-right: 15px;
+    }
+    ul#bookList li button {
+      background-color: #dc3545; /* red for delete */
+      margin-left: 8px;
+      flex: 0 0 auto;
+      border: none;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    ul#bookList li button.update-btn {
+      background-color: #28a745; /* green for update */
+    }
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 400px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .modal-content input {
+      width: 100%;
+      margin: 8px 0;
+      padding: 8px;
+      font-size: 1rem;
+    }
+    .close-btn {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: #aaa;
+    }
+    .close-btn:hover {
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <h1>Library Books</h1>
+
+  <!-- Form to add a new book -->
+  <form id="bookForm">
+    <input type="text" id="title" placeholder="Book Title" required />
+    <input type="text" id="author" placeholder="Author" required />
+    <input type="number" id="copiesInStock" placeholder="Copies In Stock" required min="0" />
+    <input type="number" id="copiesLentOut" placeholder="Copies Lent Out" required min="0" />
+    <button type="submit">Add Book</button>
+  </form>
+
+  <!-- List of books -->
+  <ul id="bookList"></ul>
+
+  <!-- Update Modal -->
+  <div id="updateModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" id="closeModal">&times;</span>
+      <h3>Update Book</h3>
+      <form id="updateForm">
+        <input type="text" id="updateTitle" placeholder="Book Title" required />
+        <input type="text" id="updateAuthor" placeholder="Author" required />
+        <input type="number" id="updateCopiesInStock" placeholder="Copies In Stock" required min="0" />
+        <input type="number" id="updateCopiesLentOut" placeholder="Copies Lent Out" required min="0" />
+        <button type="submit">Update Book</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Change this to your backend API URL if different from frontend origin
+    const baseUrl = "http://localhost:2943/books";
+
+    // Create a single book list item DOM node
+    function createBookListItem(book) {
+      const li = document.createElement("li");
+      li.dataset.id = book.id || book._id; // backend might use id or _id
+
+      // Book info text
+      const infoSpan = document.createElement("span");
+      infoSpan.className = "info";
+      infoSpan.textContent = `${book.title} by ${book.author} | In Stock: ${book.copiesInStock} | Lent Out: ${book.copiesLentOut}`;
+      li.appendChild(infoSpan);
+
+      // Update button
+      const updateBtn = document.createElement("button");
+      updateBtn.textContent = "Update";
+      updateBtn.className = "update-btn";
+      updateBtn.addEventListener("click", () => openUpdateModal(book));
+      li.appendChild(updateBtn);
+
+      // Delete button
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Delete";
+      deleteBtn.addEventListener("click", () => deleteBook(book.id || book._id, li));
+      li.appendChild(deleteBtn);
+
+      return li;
+    }
+
+    // Load all books from backend and show in UI
+    async function loadBooks() {
+      try {
+        const res = await fetch(baseUrl);
+        if (!res.ok) throw new Error("Failed to fetch books");
+        const books = await res.json();
+        const list = document.getElementById("bookList");
+        list.innerHTML = "";
+        books.forEach(book => {
+          list.appendChild(createBookListItem(book));
+        });
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    // Add book form submit handler
+    document.getElementById("bookForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const title = this.title.value.trim();
+      const author = this.author.value.trim();
+      const copiesInStock = Number(this.copiesInStock.value);
+      const copiesLentOut = Number(this.copiesLentOut.value);
+
+      if (copiesLentOut > copiesInStock) {
+        alert("Copies lent out cannot be more than copies in stock.");
+        return;
+      }
+
+      try {
+        const res = await fetch(baseUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, author, copiesInStock, copiesLentOut }),
+        });
+        if (!res.ok) throw new Error("Failed to add book");
+
+        const newBook = await res.json();
+        document.getElementById("bookList").appendChild(createBookListItem(newBook));
+        this.reset();
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    // Delete a book by id
+    async function deleteBook(id, listItem) {
+      if (!confirm("Are you sure you want to delete this book?")) return;
+
+      try {
+        const res = await fetch(`${baseUrl}/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed to delete book");
+        listItem.remove();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    // Update modal and form logic
+    const modal = document.getElementById("updateModal");
+    const closeModalBtn = document.getElementById("closeModal");
+    const updateForm = document.getElementById("updateForm");
+    let currentBookId = null;
+
+    function openUpdateModal(book) {
+      currentBookId = book.id || book._id;
+      updateForm.updateTitle.value = book.title;
+      updateForm.updateAuthor.value = book.author;
+      updateForm.updateCopiesInStock.value = book.copiesInStock;
+      updateForm.updateCopiesLentOut.value = book.copiesLentOut;
+      modal.style.display = "block";
+    }
+
+    closeModalBtn.onclick = () => {
+      modal.style.display = "none";
+    };
+
+    window.onclick = event => {
+      if (event.target === modal) modal.style.display = "none";
+    };
+
+    // Handle update form submission
+    updateForm.addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const title = this.updateTitle.value.trim();
+      const author = this.updateAuthor.value.trim();
+      const copiesInStock = Number(this.updateCopiesInStock.value);
+      const copiesLentOut = Number(this.updateCopiesLentOut.value);
+
+      if (copiesLentOut > copiesInStock) {
+        alert("Copies lent out cannot be more than copies in stock.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`${baseUrl}/${currentBookId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, author, copiesInStock, copiesLentOut }),
+        });
+        if (!res.ok) throw new Error("Failed to update book");
+
+        const updatedBook = await res.json();
+
+        // Update UI
+        const listItems = document.querySelectorAll(`#bookList li`);
+        listItems.forEach(li => {
+          if (li.dataset.id == currentBookId) {
+            li.querySelector(".info").textContent = 
+              `${updatedBook.title} by ${updatedBook.author} | In Stock: ${updatedBook.copiesInStock} | Lent Out: ${updatedBook.copiesLentOut}`;
+          }
+        });
+
+        modal.style.display = "none";
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    // On page load, fetch all books
+    window.onload = loadBooks;
+  </script>
+</body>
+</html>
